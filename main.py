@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Annotated, List, Optional
-
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from contextlib import asynccontextmanager
+import pandas as pd
 
+# Models
 class Announcement(SQLModel, table = True):
     id: int = Field(default=None, primary_key=True)    
     user_name: str
@@ -28,42 +29,14 @@ class User(SQLModel, table = True):
     students: Optional[List[str]] = None    # List of students (names or ids, depending on your logic)
     teacher: Optional[str] = None      # Optional teacher name, if applicable
 
-
+# Database setup
 sqlite_database_name = "bootcampPortalDatabase.db"
 sqlite_url = f"sqlite:///{sqlite_database_name}"
 connect_args = {"check_same_thread": False}
 engine = create_engine(sqlite_url, connect_args=connect_args, echo=True)
- 
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        default_announcements = [
-            Announcement(
-                user_name = "Kimber", 
-                tag = "@Homework", 
-                description = "There is no homework due to the hackathon", 
-                imgUrl = "https://webv2-backend.appdevclub.com/team-images/kimber-gonzalez-lopez.jpeg"
-            ),
-            Announcement(
-                user_name = "Aidan", 
-                tag = "@Events", 
-                description = "There is a new event happening on Tuesday from 6:30-7:30", 
-                imgUrl = "https://webv2-backend.appdevclub.com/team-images/aidan-melvin.jpeg"
-            ),
-            Announcement(
-                user_name = "Kimber", 
-                tag = "@Help", 
-                description = "I need some members to help me make a website, dm if interested", 
-                imgUrl = "https://webv2-backend.appdevclub.com/team-images/kimber-gonzalez-lopez.jpeg"
-            ),
-        ]
-
-        existing = session.exec(select(Announcement)).all()
-
-        if not existing:
-            session.add_all(default_announcements)
-            session.commit()
 
 def reset_db_and_tables():
     SQLModel.metadata.drop_all(engine)
@@ -79,6 +52,48 @@ SessionDep = Annotated[Session, Depends(get_session)]
 async def lifespan(app: FastAPI):
     print("Setting up the database...")
     create_db_and_tables()
+
+    # Populate Users from CSV
+    df_users = pd.read_csv("users.csv")
+    users = []
+    for _, row in df_users.iterrows():
+        user = User(
+            id=int(row['id']),
+            name=row['name'],
+            password=row['password'],
+            role=row['role'],
+            imgURL=row['imgURL'],
+            linkdinURL=row['linkdinURL'],
+            githubURL=row['githubURL'],
+            websiteURL=row['websiteURL'] if pd.notna(row['websiteURL']) else None,
+            resumeURL=row['resumeURL'] if pd.notna(row['resumeURL']) else None,
+            teammates=row['teammates'].split(',') if pd.notna(row['teammates']) else None,
+            mentors=row['mentors'].split(',') if pd.notna(row['mentors']) else None,
+            students=row['students'].split(',') if pd.notna(row['students']) else None,
+            teacher=row['teacher'] if pd.notna(row['teacher']) else None
+        )
+        users.append(user)
+
+    with Session(engine) as session:
+        session.add_all(users)
+        session.commit()
+
+    # Populate Announcements from CSV
+    df_announcements = pd.read_csv("announcements.csv")
+    announcements = []
+    for _, row in df_announcements.iterrows():
+        announcement = Announcement(
+            id=int(row['id']),
+            user_name=row['user_name'],
+            tag=row['tag'],
+            description=row['description']
+        )
+        announcements.append(announcement)
+
+    with Session(engine) as session:
+        session.add_all(announcements)
+        session.commit()
+
     yield
     print("App shutdown")
 
