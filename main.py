@@ -1,16 +1,33 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Annotated
+from typing import Annotated, List, Optional
+
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from contextlib import asynccontextmanager
 
-
 class Announcement(SQLModel, table = True):
     id: int = Field(default=None, primary_key=True)    
-    author: str
+    user_name: str
     tag: str
     description: str
-    imgUrl: str
+
+class User(SQLModel, table = True):
+    id: int = Field(default=None, primary_key=True)    
+    name: str # User John Doe will have the name: "John Doe"
+    password: str
+    role: str # Roles include: [STUDENT, MENTOR, TEACHER]
+    
+    imgURL: str 
+    linkdinURL: str
+    githubURL: str
+    websiteURL: Optional[str] = None
+    resumeURL: Optional[str] = None
+
+    teammates: Optional[List[str]] = None  # List of teammates (names or ids, depending on your logic)
+    mentors: Optional[List[str]] = None     # List of mentors (names or ids, depending on your logic)
+    students: Optional[List[str]] = None    # List of students (names or ids, depending on your logic)
+    teacher: Optional[str] = None      # Optional teacher name, if applicable
+
 
 sqlite_database_name = "bootcampPortalDatabase.db"
 sqlite_url = f"sqlite:///{sqlite_database_name}"
@@ -23,19 +40,19 @@ def create_db_and_tables():
     with Session(engine) as session:
         default_announcements = [
             Announcement(
-                author = "Kimber", 
+                user_name = "Kimber", 
                 tag = "@Homework", 
                 description = "There is no homework due to the hackathon", 
                 imgUrl = "https://webv2-backend.appdevclub.com/team-images/kimber-gonzalez-lopez.jpeg"
             ),
             Announcement(
-                author = "Aidan", 
+                user_name = "Aidan", 
                 tag = "@Events", 
                 description = "There is a new event happening on Tuesday from 6:30-7:30", 
                 imgUrl = "https://webv2-backend.appdevclub.com/team-images/aidan-melvin.jpeg"
             ),
             Announcement(
-                author = "Kimber", 
+                user_name = "Kimber", 
                 tag = "@Help", 
                 description = "I need some members to help me make a website, dm if interested", 
                 imgUrl = "https://webv2-backend.appdevclub.com/team-images/kimber-gonzalez-lopez.jpeg"
@@ -51,7 +68,7 @@ def create_db_and_tables():
 def reset_db_and_tables():
     SQLModel.metadata.drop_all(engine)
     create_db_and_tables()
-    
+
 def get_session():
     with Session(engine) as session:
         yield session
