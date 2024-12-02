@@ -61,8 +61,6 @@ class User(SQLModel, table=True):
         }
     )
 
-
-
     # Teammates (Self-Referential Many-to-Many)
     teammates: List["User"] = Relationship(
         link_model=TeammateLink,
@@ -147,11 +145,11 @@ async def lifespan(app: FastAPI):
     announcements = []
     for _, row in df_announcements.iterrows():
         announcement = Announcement(
-            # id=int(row['id']),
             user_name=row['user_name'],
             tag=row['tag'],
             description=row['description']
         )
+
         announcements.append(announcement)
 
     with Session(engine) as session:
@@ -176,6 +174,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get('/mentors')
+async def get_mentors(name: str, session: SessionDep):
+    user = session.exec(select(User).where(User.name == name)).first()
+    if not user:
+         raise HTTPException(status_code=404, detail="User not found")
+    return user.mentors
+
+@app.get('/mentees')
+async def get_mentees(name: str, session: SessionDep):
+    user = session.exec(select(User).where(User.name == name)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.mentees
+
+@app.get('/students')
+async def get_mentees(name: str, session: SessionDep):
+    user = session.exec(select(User).where(User.name == name)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.students
+
+@app.get('/teacher')
+async def get_mentees(name: str, session: SessionDep):
+    user = session.exec(select(User).where(User.name == name)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.teacher
+
+@app.get('/teammates')
+async def get_teammates(name: str, session: SessionDep):
+    user = session.exec(select(User).where(User.name == name)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user.teammates
+
+@app.get('/links')
+async def get_links(name: str, session: SessionDep):
+    user = session.exec(select(User).where(User.name == name)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    output = {
+        "img_url" : user.imgURL,
+        "linkdin_url": user.linkdinURL,
+        "github_url": user.githubURL,
+        "website_url": user.websiteURL,
+        "resume_url": user.resumeURL,
+    }
+    return output
+
 @app.get('/announcements')
 async def get_announcements(session: SessionDep):
     announcements = session.exec(select(Announcement)).all()
@@ -192,8 +240,7 @@ async def post_announcement(announcement: Announcement, session: SessionDep):
         raise HTTPException(status_code=500, detail="Database commit failed")  
       
     session.refresh(announcement)
-    return announcement 
-
+    return announcement
 
 @app.post('/reset-db')
 async def reset_database():
