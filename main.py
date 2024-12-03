@@ -33,16 +33,6 @@ class User(SQLModel, table=True):
     websiteURL: Optional[str] = None
     resumeURL: Optional[str] = None
 
-    # Teacher-Student Relationship (Many-to-One)
-    teacher_id: Optional[int] = Field(default=None, foreign_key="user.id")
-    teacher: Optional["User"] = Relationship(
-        back_populates="students", 
-        sa_relationship_kwargs={"remote_side": "User.id"}
-    )
-    students: List["User"] = Relationship(
-        back_populates="teacher"
-    )
-
     # Mentors (Many-to-Many)
     mentors: List["User"] = Relationship(
         back_populates="mentees",
@@ -111,33 +101,44 @@ async def lifespan(app: FastAPI):
     gavin_website_url = "https://www.gavinkhung.me/"
     gavin_resume_url = "https://www.gavinkhung.me/resume.pdf"
 
+    nitish_img_url = "https://media.licdn.com/dms/image/v2/D4D03AQEa5gW0m0rK2w/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1710454008903?e=1738800000&v=beta&t=k-noAhPxE5f--Tovvi0EsIp1GqeTuVJDh-O07GjnFms"
+    nitish_linkdin_url = "https://www.linkedin.com/in/nitish-vobilisetti-swe/,"
+    nitish_github_url = "https://github.com/nitvob"
+
     # Kimber Info
     kimber_img_url = "https://webv2-backend.appdevclub.com/team-images/kimber-gonzalez-lopez.jpeg"
     kimber_linkdin_url = "https://www.linkedin.com/in/kimber-gonzalez-lopez/"
     kimber_github_url = "https://github.com/KiberVG"
 
-    aryan = User(name="Aryan", password="pass123", role="STUDENT", imgURL=aryan_img_url, linkdinURL=aryan_linkdin_url, githubURL=aryan_github_url)
-    aditi = User(name="Aditi", password="pass123", role="STUDENT", imgURL=aditi_img_url, linkdinURL=aditi_linkdin_url, githubURL=aditi_github_url)
+    aryan = User(name="Aryan", password="pass123", role="MENTEE", imgURL=aryan_img_url, linkdinURL=aryan_linkdin_url, githubURL=aryan_github_url)
+    aditi = User(name="Aditi", password="pass123", role="MENTEE", imgURL=aditi_img_url, linkdinURL=aditi_linkdin_url, githubURL=aditi_github_url)
     gavin = User(name="Gavin", password="mentor123", role="MENTOR", imgURL=gavin_img_url, linkdinURL=gavin_linkdin_url, githubURL=gavin_github_url, websiteURL = gavin_website_url, resumeURL = gavin_resume_url)
-    kimber = User(name="Kimber", password="teach123", role="TEACHER", imgURL=kimber_img_url, linkdinURL=kimber_linkdin_url, githubURL=kimber_github_url)
+    # kimber = User(name="Kimber", password="teach123", role="TEACHER", imgURL=kimber_img_url, linkdinURL=kimber_linkdin_url, githubURL=kimber_github_url)
+    nitish = User(name="Nitish", password="mentor123", role="MENTOR", imgURL=nitish_img_url, linkdinURL=nitish_linkdin_url, githubURL=nitish_github_url)
 
     aryan.teammates.append(aditi)
     aditi.teammates.append(aryan)
 
-    kimber.teammates.append(gavin)
-    gavin.teammates.append(kimber)
+    # kimber.teammates.append(gavin)
+    # gavin.teammates.append(kimber)
 
-    aryan.teacher = kimber
-    aditi.teacher = kimber
+    # aryan.teacher = kimber
+    # aditi.teacher = kimber
 
     gavin.mentees.append(aryan)
     gavin.mentees.append(aditi)
+    
+    nitish.mentees.append(aryan)
+    nitish.mentees.append(aditi)
 
-    kimber.students.append(aryan)
-    kimber.students.append(aditi)
+    gavin.teammates.append(nitish)
+    nitish.teammates.append(gavin)
+
+    # kimber.students.append(aryan)
+    # kimber.students.append(aditi)
 
     with Session(engine) as session:
-        session.add_all([aryan,aditi,kimber,gavin])
+        session.add_all([aryan,aditi,gavin, nitish])
         session.commit()
 
     # Populate Announcements from CSV
@@ -188,19 +189,6 @@ async def get_mentees(name: str, session: SessionDep):
         raise HTTPException(status_code=404, detail="User not found")
     return user.mentees
 
-@app.get('/students')
-async def get_mentees(name: str, session: SessionDep):
-    user = session.exec(select(User).where(User.name == name)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user.students
-
-@app.get('/teacher')
-async def get_mentees(name: str, session: SessionDep):
-    user = session.exec(select(User).where(User.name == name)).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user.teacher
 
 @app.get('/teammates')
 async def get_teammates(name: str, session: SessionDep):
